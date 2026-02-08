@@ -4,30 +4,94 @@ __pycache__/
 *$py.class
 *.so
 .Python
-venv/
-env/
-ENV/
+*.egg
 *.egg-info/
 dist/
 build/
+.eggs/
 
-# Environment
+# Virtual Environments
+venv/
+env/
+ENV/
+venv.bak/
+env.bak/
+
+# Environment & Secrets
 .env
 .env.local
+.env.*.local
+.env.production
 
-# Generated/Temp Files
+# IDE & Editor
+.vscode/
+.idea/
+.sublime-project
+.sublime-workspace
+*.swp
+*.swo
+*~
+.project
+.classpath
+
+# OS & System
+.DS_Store
+Thumbs.db
+.AppleDouble
+.LSOverride
+
+# Generated/Temp Files & Outputs
 generated/
 jobs/
 temp/
 tmp/
 uploads/
+downloads/
+outputs/
+results/
+cache/
+__pycache__/
+*.log
+
+# Media Files (generated during processing)
 *.glb
 *.gltf
+*.glb.gz
+*.gltf.gz
 *.png
 *.jpg
 *.jpeg
+*.gif
+*.webp
+*.mp4
+*.mp3
+*.wav
+*.mov
+*.avi
 
-# Cache
+# Database
+*.db
+*.sqlite
+*.sqlite3
+*.pkl
+*.pickle
+
+# Testing & Coverage
 .pytest_cache/
 .mypy_cache/
-.DS_Store
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# Build & Deploy
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Misc
+.dmypy.json
+dmypy.json
+*.pyo
+.env.prod
+.env.dev
