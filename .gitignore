@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Environment
+.env
+.env.local
+
+# Generated/Temp Files
+generated/
+jobs/
+temp/
+tmp/
+uploads/
+*.glb
+*.gltf
+*.png
+*.jpg
+*.jpeg
+
+# Cache
+.pytest_cache/
+.mypy_cache/
+.DS_Store

@@ -1,0 +1,17 @@
+{
+  "workflow": {
+    "name": "Test Load Suno Music",
+    "nodes": [
+      {
+        "id": "load_1",
+        "type": "load_suno_from_taskid",
+        "config": {
+          "task_id": "2be47a1ab2ccb8ba3ade90a1af55abae",
+          "clip_index": 0,
+          "download_all": false
+        }
+      }
+    ],
+    "edges": []
+  }
+}

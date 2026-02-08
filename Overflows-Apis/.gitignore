@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Generated/Temp Files
+*.log
+*.pot
+.coverage
+htmlcov/
+
+# Media/Assets generated from jobs
+generated/
+jobs/
+temp/
+tmp/
+uploads/
+*.glb
+*.gltf
+*.png
+*.jpg
+*.jpeg
+output/
+results/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Cache
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# macOS
+.DS_Store

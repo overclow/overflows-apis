@@ -1,0 +1,28 @@
+{
+  "workflow": {
+    "nodes": [
+      {
+        "id": "1",
+        "type": "load_suno_from_taskid",
+        "config": {
+          "task_id": "2be47a1ab2ccb8ba3ade90a1af55abae",
+          "clip_index": 0
+        }
+      },
+      {
+        "id": "2",
+        "type": "separate_vocals",
+        "config": {
+          "type": "separate_vocal",
+          "wait_for_completion": true
+        }
+      }
+    ],
+    "edges": [
+      {
+        "source": "1",
+        "target": "2"
+      }
+    ]
+  }
+}

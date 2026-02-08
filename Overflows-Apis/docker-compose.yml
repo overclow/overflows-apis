@@ -1,0 +1,27 @@
+services:
+  animation-api:
+    build:
+      context: .
+      dockerfile: docker/animation/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGODB_URL=mongodb://host.docker.internal:27017
+    env_file:
+      - .env
+    restart: unless-stopped
+
+  workflow-api:
+    build:
+      context: .
+      dockerfile: docker/workflow/Dockerfile
+    ports:
+      - "8100:8100"
+    environment:
+      - ANIMATION_API_URL=http://animation-api:8000
+      - MONGODB_URL=mongodb://host.docker.internal:27017
+    env_file:
+      - .env
+    depends_on:
+      - animation-api
+    restart: unless-stopped

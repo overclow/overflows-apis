@@ -1,0 +1,17 @@
+{
+  "workflow": {
+    "nodes": [
+      {
+        "id": "1",
+        "type": "separate_vocals",
+        "config": {
+          "task_id": "2be47a1ab2ccb8ba3ade90a1af55abae",
+          "audio_id": "87dc4b18-216e-49a7-a4a6-30fa5b7ffbca",
+          "type": "split_stem",
+          "wait_for_completion": true
+        }
+      }
+    ],
+    "edges": []
+  }
+}

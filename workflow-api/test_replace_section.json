@@ -1,0 +1,24 @@
+{
+  "workflow": {
+    "name": "Test Replace Music Section",
+    "nodes": [
+      {
+        "id": "replace_1",
+        "type": "replace_music_section",
+        "config": {
+          "task_id": "2be47a1ab2ccb8ba3ade90a1af55abae",
+          "audio_id": "87dc4b18-216e-4cba-b925-9d72b920e3a4",
+          "prompt": "Upbeat electronic dance beat with energetic synths",
+          "full_lyrics": "[Verse]\nDance through the night\nFeel the rhythm take flight\n\n[Chorus]\nMove to the beat\nFeel the heat\nLet the music set you free",
+          "tags": "electronic, dance, edm",
+          "title": "Dance Revolution - Modified",
+          "infill_start_s": 30.0,
+          "infill_end_s": 45.0,
+          "negative_tags": "slow, sad, acoustic",
+          "wait_for_completion": false
+        }
+      }
+    ],
+    "edges": []
+  }
+}
