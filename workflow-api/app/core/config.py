@@ -32,6 +32,9 @@ ALLOWED_ORIGINS = [
     "http://localhost:5173",  # Vite default port
     "http://localhost:5174",  # Vite alternate port
     "http://localhost:3000",  # React default port
+    "http://localhost:3001",  # Client port
+    "http://127.0.0.1:3000",  # React with 127.0.0.1
+    "http://127.0.0.1:3001",  # Client with 127.0.0.1 (NEW)
     "http://localhost:8080",  # Common dev port
     "http://localhost:4200",  # Angular default port
 ]
