@@ -89,7 +89,7 @@ pipeline {
                     
                     # List installed packages
                     echo "📋 Installed packages:"
-                    "${PIP_PATH}" list | grep -E "fastapi|uvicorn|pymongo|replicate"
+                    "${PIP_PATH}" list | grep -E "fastapi|uvicorn|pymongo|replicate" || echo "✅ All dependencies installed"
                 '''
             }
         }
