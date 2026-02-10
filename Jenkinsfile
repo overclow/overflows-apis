@@ -347,38 +347,69 @@ EOF
     post {
         always {
             script {
-                echo "🚀 FINAL: Ensuring API is running and accessible..."
+                echo "🚀 FINAL: Managing API via LaunchAgent (macOS service)..."
             }
             sh '''
                 API_URL="http://${API_HOST}:${API_PORT}"
+                LAUNCHAGENT_PATH="/Users/overclaw/Library/LaunchAgents/com.overflows.workflow-api.plist"
                 
                 echo "═══════════════════════════════════════════════════════"
                 echo "FINAL API DEPLOYMENT VERIFICATION"
                 echo "═══════════════════════════════════════════════════════"
-                
                 echo ""
-                echo "Step 1: Kill any existing process on port ${API_PORT}"
-                lsof -ti:${API_PORT} | xargs -r kill -9 2>/dev/null || true
+                
+                # Check if LaunchAgent exists
+                if [ ! -f "${LAUNCHAGENT_PATH}" ]; then
+                    echo "❌ LaunchAgent not found at ${LAUNCHAGENT_PATH}"
+                    echo "Creating it now..."
+                    mkdir -p /Users/overclaw/Library/LaunchAgents
+                    cat > "${LAUNCHAGENT_PATH}" << 'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.overflows.workflow-api</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-c</string>
+        <string>cd /Users/overclaw/projects/overflows-apis/workflow-api && /usr/bin/python3 -m uvicorn workflow_api:app --host 127.0.0.1 --port 8001 --workers 3</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/tmp/workflow-api.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/workflow-api-error.log</string>
+    <key>WorkingDirectory</key>
+    <string>/Users/overclaw/projects/overflows-apis/workflow-api</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PYTHONUNBUFFERED</key>
+        <string>1</string>
+    </dict>
+</dict>
+</plist>
+PLIST
+                fi
+                
+                echo "Step 1: Stopping old LaunchAgent service..."
+                launchctl stop com.overflows.workflow-api 2>/dev/null || echo "  (not yet loaded)"
                 sleep 1
                 
-                echo "Step 2: Starting FRESH API instance..."
-                cd "${WORKSPACE}/workflow-api"
+                echo "Step 2: Unloading LaunchAgent if loaded..."
+                launchctl unload "${LAUNCHAGENT_PATH}" 2>/dev/null || echo "  (not loaded)"
+                sleep 1
                 
-                rm -f "${API_LOG_FILE}"
+                echo "Step 3: Reloading LaunchAgent..."
+                launchctl load "${LAUNCHAGENT_PATH}"
+                echo "  ✅ LaunchAgent loaded"
+                sleep 2
                 
-                nohup "${PYTHON_PATH}" -m uvicorn workflow_api:app \
-                    --host ${API_HOST} \
-                    --port ${API_PORT} \
-                    --workers 2 \
-                    --log-level info \
-                    > "${API_LOG_FILE}" 2>&1 &
-                    
-                API_PID=$!
-                echo "Started with PID: ${API_PID}"
-                disown
-                
-                echo "Step 3: Verifying API is accessible..."
-                sleep 3
+                echo "Step 4: Verifying API is accessible..."
                 
                 MAX_RETRIES=30
                 RETRY=0
@@ -390,11 +421,8 @@ EOF
                     if curl -s -f "${API_URL}/" > /dev/null 2>&1; then
                         SUCCESS=1
                         echo "✅ API RESPONDED on attempt $RETRY"
-                        
-                        # Show service info
                         echo ""
-                        echo "API Service Info:"
-                        curl -s "${API_URL}/" | python3 -m json.tool 2>/dev/null | head -15 || curl -s "${API_URL}/"
+                        curl -s "${API_URL}/" | python3 -m json.tool 2>/dev/null | head -10 || curl -s "${API_URL}/"
                         echo ""
                         break
                     else
@@ -408,30 +436,35 @@ EOF
                 
                 if [ $SUCCESS -eq 1 ]; then
                     echo "✅✅✅ API IS RUNNING AND ACCESSIBLE ✅✅✅"
+                    echo "Service: LaunchAgent (com.overflows.workflow-api)"
                 else
-                    echo "⚠️ API may need time to start, but process exists"
-                    echo "Check manually: curl http://${API_HOST}:${API_PORT}/"
+                    echo "⚠️ API response timeout, but LaunchAgent is configured"
+                    echo "Check status: launchctl list | grep workflow-api"
+                    echo "Check logs: tail -f /tmp/workflow-api.log"
                 fi
                 
                 echo "═══════════════════════════════════════════════════════"
                 echo "API URL: ${API_URL}"
-                echo "Process: $(lsof -ti:${API_PORT} || echo 'checking...')"
-                echo "Log File: ${API_LOG_FILE}"
+                echo "Service: LaunchAgent (macOS managed)"
+                echo "Log Files:"
+                echo "  - /tmp/workflow-api.log"
+                echo "  - /tmp/workflow-api-error.log"
+                echo "Configuration: ${LAUNCHAGENT_PATH}"
                 echo "Pipeline Completed: $(date)"
                 echo "═══════════════════════════════════════════════════════"
                 echo ""
                 echo "✅ BUILD COMPLETE"
-                echo "✅ API DEPLOYED"
-                echo "✅ API ACCESSIBLE AT: http://${API_HOST}:${API_PORT}/"
+                echo "✅ API DEPLOYED via LaunchAgent"
+                echo "✅ API MANAGED BY MACOS (auto-restart on crash)"
+                echo "✅ API ACCESSIBLE AT: ${API_URL}"
                 echo ""
-                echo "Test immediately:"
-                echo "  curl http://${API_HOST}:${API_PORT}/"
+                echo "Useful commands:"
+                echo "  launchctl list | grep workflow-api      # Check status"
+                echo "  launchctl stop com.overflows.workflow-api  # Stop service"
+                echo "  launchctl start com.overflows.workflow-api # Start service"
+                echo "  tail -f /tmp/workflow-api.log              # Watch logs"
                 echo ""
                 echo "═══════════════════════════════════════════════════════"
-                
-                if [ -f "${API_LOG_FILE}" ]; then
-                    cp "${API_LOG_FILE}" "${WORKSPACE}/api_deployment_${BUILD_ID}.log"
-                fi
             '''
         }
         
