@@ -366,19 +366,67 @@ EOF
             }
         }
 
-        failure {
+        always {
             script {
-                echo "❌ Pipeline failed!"
+                echo "🚀 Ensuring API is deployed..."
             }
             sh '''
-                echo "Debugging info on failure:"
-                echo ""
-                echo "📋 Last 50 lines of deployment log:"
-                tail -50 "${API_LOG_FILE}" || echo "No log file"
-                echo ""
-                echo "🔍 Process status:"
-                lsof -i :${API_PORT} || echo "No process on port ${API_PORT}"
+                # Always try to deploy/restart the API at the end
+                API_URL="http://${API_HOST}:${API_PORT}"
+                
+                # Check if API is already running
+                if lsof -ti:${API_PORT} > /dev/null 2>&1; then
+                    echo "✅ API is already running on port ${API_PORT}"
+                    curl -s "${API_URL}/" | head -c 100
+                    echo ""
+                else
+                    echo "⚠️ API not running, starting it now..."
+                    
+                    # Start the API
+                    cd "${WORKSPACE}/workflow-api"
+                    
+                    nohup "${PYTHON_PATH}" -m uvicorn workflow_api:app \
+                        --host ${API_HOST} \
+                        --port ${API_PORT} \
+                        --workers 2 \
+                        --log-level info \
+                        > "${API_LOG_FILE}" 2>&1 &
+                    
+                    API_PID=$!
+                    disown
+                    
+                    echo "Started API (PID: ${API_PID})"
+                    sleep 3
+                    
+                    # Verify it started
+                    if curl -s -f "${API_URL}/" > /dev/null 2>&1; then
+                        echo "✅ API is now running!"
+                    else
+                        echo "⚠️ API may not be responding yet"
+                    fi
+                fi
             '''
+        }
+
+        failure {
+            script {
+                echo "❌ Pipeline encountered issues"
+            }
+            sh '''
+                echo "Debugging info:"
+                echo ""
+                echo "📋 Last 30 lines of deployment log:"
+                tail -30 "${API_LOG_FILE}" 2>/dev/null || echo "No log file"
+                echo ""
+                echo "🔍 Process status on port ${API_PORT}:"
+                lsof -i :${API_PORT} 2>/dev/null || echo "No process found"
+            '''
+        }
+
+        success {
+            script {
+                echo "✅ Pipeline completed successfully!"
+            }
         }
     }
 }
