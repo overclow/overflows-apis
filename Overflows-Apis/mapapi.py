@@ -4,7 +4,7 @@ import time
 import json
 import mimetypes
 import threading
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Union
 import requests
 import base64
 from dotenv import load_dotenv
@@ -523,7 +523,7 @@ def extract_most_prominent_object(objects_description: str) -> str:
     
     return "building"  # ultimate fallback
 
-def stream_get_to_file(url: str, *, headers: dict | None = None, out_path: str = OUT_GLBF):
+def stream_get_to_file(url: str, *, headers: Optional[dict] = None, out_path: str = OUT_GLBF):
     """Stream a GET response (no timeout) to file with progress."""
     with requests.get(url, headers=headers, stream=True, timeout=None, allow_redirects=True) as r:
         r.raise_for_status()
@@ -560,8 +560,8 @@ def stream_get_to_file(url: str, *, headers: dict | None = None, out_path: str =
 
     return True, {"status_code": 200, "file": out_path}
 
-def post_hunyuan_to_file_with_retry(url: str, *, headers: dict, data: dict | None,
-                         files: dict | None, out_path: str, max_retries: int = 3):
+def post_hunyuan_to_file_with_retry(url: str, *, headers: dict, data: Optional[dict],
+                         files: Optional[dict], out_path: str, max_retries: int = 3):
     """
     POST to Segmind with retry logic for server errors.
     Handles common API failures with exponential backoff and optimized parameters for timeout recovery.
@@ -667,8 +667,8 @@ def post_hunyuan_to_file_with_retry(url: str, *, headers: dict, data: dict | Non
     print(f"❌ All {max_retries} attempts failed")
     return False, {"error": "Max retries exceeded", "attempts": max_retries}
 
-def post_hunyuan_to_file(url: str, *, headers: dict, data: dict | None,
-                         files: dict | None, out_path: str):
+def post_hunyuan_to_file(url: str, *, headers: dict, data: Optional[dict],
+                         files: Optional[dict], out_path: str):
     """
     POST to Segmind. Handles:
       - heartbeat while computing (before first byte),
