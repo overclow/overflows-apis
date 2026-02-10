@@ -59,13 +59,13 @@ pipeline {
                     . venv/bin/activate
                     pip install --upgrade pip setuptools wheel
                     
-                    # Install requirements
-                    if [ -f requirements.txt ]; then
-                        pip install -r requirements.txt
-                        echo "✓ Dependencies installed"
-                    elif [ -f requirements-no-textract.txt ]; then
+                    # Install requirements (use no-textract variant for stability)
+                    if [ -f requirements-no-textract.txt ]; then
                         pip install -r requirements-no-textract.txt
-                        echo "✓ Dependencies installed (no-textract variant)"
+                        echo "✓ Dependencies installed from requirements-no-textract.txt"
+                    elif [ -f requirements.txt ]; then
+                        pip install -r requirements.txt
+                        echo "✓ Dependencies installed from requirements.txt"
                     else
                         echo "⚠️ No requirements file found - attempting FastAPI installation"
                         pip install fastapi uvicorn[standard] > /dev/null 2>&1
