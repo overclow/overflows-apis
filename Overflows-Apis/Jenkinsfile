@@ -123,7 +123,7 @@ EOF
                     . venv/bin/activate
                     
                     # Start API with nohup and disown
-                    nohup python3 -m uvicorn api.workflow_api:app --host ${API_HOST} --port ${API_PORT} --reload > /tmp/overflows-api.log 2>&1 &
+                    nohup python3 -m uvicorn animation_api:app --host ${API_HOST} --port ${API_PORT} --reload > /tmp/overflows-api.log 2>&1 &
                     API_PID=$!
                     echo "$API_PID" > /tmp/api.pid
                     disown $API_PID 2>/dev/null || true
