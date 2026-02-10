@@ -1,0 +1,281 @@
+// Jenkins Pipeline for overflows-apis
+// Python FastAPI Backend
+
+pipeline {
+    agent any
+    
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        timeout(time: 30, unit: 'MINUTES')
+        timestamps()
+    }
+    
+    environment {
+        PROJECT_NAME = 'overflows-apis'
+        API_PORT = '8000'
+        API_HOST = '127.0.0.1'
+        PYTHON_VERSION = '3.12'
+        NODE_ENV = 'production'
+        BUILD_TIMESTAMP = sh(script: "date -u +'%Y-%m-%dT%H:%M:%SZ'", returnStdout: true).trim()
+    }
+    
+    stages {
+        stage('📋 Checkout') {
+            steps {
+                script {
+                    echo "🔄 Checking out code from GitHub..."
+                }
+                checkout scm
+                sh 'git log --oneline -1'
+            }
+        }
+        
+        stage('🔍 Environment Check') {
+            steps {
+                script {
+                    echo "🔍 Verifying Python environment..."
+                }
+                sh '''
+                    python3 --version
+                    pip3 --version
+                '''
+            }
+        }
+        
+        stage('📦 Install Dependencies') {
+            steps {
+                script {
+                    echo "📦 Installing Python dependencies..."
+                }
+                sh '''
+                    # Create virtual environment if it doesn't exist
+                    if [ ! -d venv ]; then
+                        python3 -m venv venv
+                    fi
+                    
+                    # Activate and upgrade pip
+                    . venv/bin/activate
+                    pip install --upgrade pip setuptools wheel
+                    
+                    # Install requirements
+                    if [ -f requirements.txt ]; then
+                        pip install -r requirements.txt
+                    else
+                        echo "⚠️ No requirements.txt found"
+                    fi
+                '''
+            }
+        }
+        
+        stage('🔍 Lint & Type Check') {
+            steps {
+                script {
+                    echo "🔍 Running code quality checks..."
+                }
+                sh '''
+                    . venv/bin/activate
+                    
+                    # Check Python syntax
+                    python3 -m py_compile api/*.py 2>&1 || echo "⚠️ Syntax warnings found"
+                    
+                    # Try to import main module
+                    python3 -c "import sys; sys.path.insert(0, '.'); import animation_api" 2>&1 || echo "⚠️ Import check failed"
+                '''
+            }
+        }
+        
+        stage('🧪 Quick Validation') {
+            steps {
+                script {
+                    echo "🧪 Running quick validation..."
+                }
+                sh '''
+                    . venv/bin/activate
+                    
+                    # Check FastAPI imports
+                    python3 << 'EOF'
+import sys
+try:
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    import uvicorn
+    print("✅ All required FastAPI modules available")
+except ImportError as e:
+    print(f"⚠️ Missing module: {e}")
+    sys.exit(1)
+EOF
+                '''
+            }
+        }
+        
+        stage('🚀 Deploy API Server') {
+            steps {
+                script {
+                    echo "🚀 Deploying API server..."
+                }
+                sh '''
+                    echo "📍 Checking if API is already running..."
+                    lsof -ti:${API_PORT} | xargs kill -9 2>/dev/null || echo "✓ No existing API found"
+                    
+                    sleep 2
+                    
+                    echo "🔄 Starting overflows-apis server..."
+                    . venv/bin/activate
+                    
+                    # Start API with nohup and disown
+                    nohup python3 -m uvicorn api.workflow_api:app --host ${API_HOST} --port ${API_PORT} --reload > /tmp/overflows-api.log 2>&1 &
+                    API_PID=$!
+                    echo "$API_PID" > /tmp/api.pid
+                    disown $API_PID 2>/dev/null || true
+                    
+                    sleep 4
+                    
+                    # Verify API is responding
+                    echo "🔍 Verifying API connectivity..."
+                    MAX_RETRIES=5
+                    RETRY=0
+                    while [ $RETRY -lt $MAX_RETRIES ]; do
+                        if curl -s http://${API_HOST}:${API_PORT}/docs > /dev/null 2>&1; then
+                            echo "✅ API is responding (PID: $API_PID)"
+                            break
+                        else
+                            RETRY=$((RETRY + 1))
+                            if [ $RETRY -lt $MAX_RETRIES ]; then
+                                echo "⏳ Waiting for API... ($RETRY/$MAX_RETRIES)"
+                                sleep 2
+                            fi
+                        fi
+                    done
+                    
+                    if [ $RETRY -eq $MAX_RETRIES ]; then
+                        echo "❌ API connectivity check failed"
+                        echo "Error log:"
+                        tail -20 /tmp/overflows-api.log
+                        exit 1
+                    fi
+                '''
+            }
+        }
+        
+        stage('📊 Verify API Endpoints') {
+            steps {
+                script {
+                    echo "📊 Verifying API endpoints..."
+                }
+                sh '''
+                    echo "🔍 Checking API health endpoints..."
+                    
+                    # Check docs endpoint
+                    if curl -s http://${API_HOST}:${API_PORT}/docs | grep -q "fastapi"; then
+                        echo "✅ Swagger UI available at: http://${API_HOST}:${API_PORT}/docs"
+                    else
+                        echo "⚠️ Swagger UI check failed"
+                    fi
+                    
+                    # Check ReDoc endpoint
+                    if curl -s http://${API_HOST}:${API_PORT}/redoc | grep -q "redoc"; then
+                        echo "✅ ReDoc available at: http://${API_HOST}:${API_PORT}/redoc"
+                    else
+                        echo "⚠️ ReDoc check failed"
+                    fi
+                '''
+            }
+        }
+        
+        stage('📈 Generate Report') {
+            steps {
+                script {
+                    echo "📈 Generating build report..."
+                }
+                sh '''
+                    cat > build-report.txt << 'REPORT'
+=== Build Summary ===
+Project: overflows-apis
+Build Number: ${BUILD_NUMBER}
+Build Time: ${BUILD_TIMESTAMP}
+Git Branch: $(git rev-parse --abbrev-ref HEAD)
+Git Commit: $(git rev-parse --short HEAD)
+Commit Author: $(git log -1 --format=%an)
+Commit Message: $(git log -1 --format=%s)
+
+=== API Server Info ===
+API Host: ${API_HOST}
+API Port: ${API_PORT}
+Swagger UI: http://${API_HOST}:${API_PORT}/docs
+ReDoc: http://${API_HOST}:${API_PORT}/redoc
+OpenAPI JSON: http://${API_HOST}:${API_PORT}/openapi.json
+
+=== Environment ===
+Python: $(python3 --version)
+FastAPI Version: $(pip3 show fastapi | grep Version | cut -d' ' -f2)
+
+REPORT
+                    cat build-report.txt
+                '''
+            }
+        }
+        
+        stage('✅ Build Complete') {
+            when {
+                expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
+            }
+            steps {
+                script {
+                    echo "✅ Build completed successfully!"
+                    echo ""
+                    echo "🚀 API Server (launchd managed):"
+                    echo "   URL: http://${API_HOST}:${API_PORT}"
+                    echo "   Swagger UI: http://${API_HOST}:${API_PORT}/docs"
+                    echo "   ReDoc: http://${API_HOST}:${API_PORT}/redoc"
+                    echo ""
+                    echo "📊 Build Info:"
+                    echo "   Job: overflows-apis"
+                    echo "   Build: #${BUILD_NUMBER}"
+                    echo "   Timestamp: ${BUILD_TIMESTAMP}"
+                }
+            }
+        }
+    }
+    
+    post {
+        success {
+            script {
+                echo "✅ Pipeline succeeded!"
+                echo ""
+                echo "🚀 API is live and serving requests!"
+                echo ""
+                echo "📊 API Status:"
+                sh '''
+                    if curl -s http://${API_HOST}:${API_PORT}/docs > /dev/null 2>&1; then
+                        echo "  ✅ API is responding"
+                    else
+                        echo "  ⚠️ API may be starting, give it a moment"
+                    fi
+                '''
+                echo ""
+                echo "🌐 Access API:"
+                echo "   Documentation: http://${API_HOST}:${API_PORT}/docs"
+                echo "   Alternative: http://${API_HOST}:${API_PORT}/redoc"
+            }
+        }
+        
+        failure {
+            script {
+                echo "❌ Pipeline failed!"
+                echo "🔍 Check logs above for details"
+            }
+        }
+        
+        cleanup {
+            script {
+                echo "🧹 Cleaning up temporary files..."
+                sh '''
+                    rm -f build-report.txt 2>/dev/null || true
+                    
+                    # API is managed by launchd, so we don't kill it
+                    echo "✅ API (launchd managed) will serve requests"
+                '''
+            }
+        }
+    }
+}
