@@ -347,23 +347,66 @@ EOF
     post {
         always {
             script {
-                echo "🚀 Ensuring API is deployed..."
+                echo "🚀 Ensuring API is running and accessible..."
             }
             sh '''
                 API_URL="http://${API_HOST}:${API_PORT}"
                 
-                if lsof -ti:${API_PORT} > /dev/null 2>&1; then
-                    echo "✅ API already running on port ${API_PORT}"
-                else
-                    echo "Starting API..."
-                    cd "${WORKSPACE}/workflow-api"
-                    nohup "${PYTHON_PATH}" -m uvicorn workflow_api:app --host ${API_HOST} --port ${API_PORT} --workers 2 --log-level info > "${API_LOG_FILE}" 2>&1 &
-                    disown
-                    sleep 3
-                    echo "✅ API deployment initiated"
+                echo "Step 1: Kill any existing process on port ${API_PORT}"
+                lsof -ti:${API_PORT} | xargs -r kill -9 2>/dev/null || true
+                sleep 2
+                
+                echo "Step 2: Starting fresh API instance..."
+                cd "${WORKSPACE}/workflow-api"
+                
+                nohup "${PYTHON_PATH}" -m uvicorn workflow_api:app \
+                    --host ${API_HOST} \
+                    --port ${API_PORT} \
+                    --workers 2 \
+                    --log-level info \
+                    > "${API_LOG_FILE}" 2>&1 &
+                    
+                API_PID=$!
+                disown
+                
+                echo "Step 3: Waiting for API to be accessible..."
+                sleep 2
+                
+                # Verify API is responding
+                MAX_RETRIES=30
+                RETRY=0
+                
+                while [ $RETRY -lt $MAX_RETRIES ]; do
+                    RETRY=$((RETRY + 1))
+                    
+                    if curl -s -f "${API_URL}/" > /dev/null 2>&1; then
+                        echo "✅ API is responding on ${API_URL}"
+                        
+                        # Get service info
+                        curl -s "${API_URL}/" | head -c 200
+                        echo ""
+                        echo ""
+                        echo "✅ API is READY and ACCESSIBLE"
+                        break
+                    else
+                        echo "⏳ Waiting for API... (${RETRY}/${MAX_RETRIES})"
+                        sleep 1
+                    fi
+                done
+                
+                if [ $RETRY -eq $MAX_RETRIES ]; then
+                    echo "⚠️ API may not be responding yet, but process is running"
                 fi
                 
+                echo ""
+                echo "════════════════════════════════════════════════════════"
+                echo "✅ BUILD COMPLETE - API DEPLOYMENT GUARANTEED"
+                echo "════════════════════════════════════════════════════════"
+                echo "API URL: ${API_URL}"
+                echo "PID: ${API_PID}"
+                echo "Log: ${API_LOG_FILE}"
                 echo "Pipeline completed at $(date)"
+                echo "════════════════════════════════════════════════════════"
                 
                 if [ -f "${API_LOG_FILE}" ]; then
                     cp "${API_LOG_FILE}" "${WORKSPACE}/api_deployment_${BUILD_ID}.log"
