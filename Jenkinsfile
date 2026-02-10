@@ -22,7 +22,7 @@ pipeline {
     }
 
     environment {
-        PYTHON_VERSION = '3.12'
+        PYTHON_VERSION = '3.9+'
         API_PORT = '8001'
         API_HOST = '127.0.0.1'
         VENV_DIR = "${WORKSPACE}/venv"
@@ -48,7 +48,7 @@ pipeline {
         stage('Setup Python Environment') {
             steps {
                 script {
-                    echo "🐍 Setting up Python 3.12 virtual environment..."
+                    echo "🐍 Setting up Python virtual environment..."
                 }
                 sh '''
                     # Remove old venv if it exists
@@ -57,8 +57,8 @@ pipeline {
                         rm -rf "${VENV_DIR}"
                     fi
                     
-                    # Create fresh venv
-                    python3.12 -m venv "${VENV_DIR}"
+                    # Create fresh venv using system python3
+                    python3 -m venv "${VENV_DIR}"
                     echo "✅ Virtual environment created"
                     
                     # Verify venv
