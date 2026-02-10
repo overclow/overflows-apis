@@ -35,7 +35,7 @@ jmespath==1.0.1
 
 # ========= ENVIRONMENT & CONFIG =========
 python-dotenv==1.1.1
-click==8.3.0
+click==8.1.8
 
 # ========= AI & ML SERVICES =========
 google-generativeai
