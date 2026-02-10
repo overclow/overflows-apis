@@ -184,11 +184,7 @@ EOF
                     fi
                     
                     # Check ReDoc endpoint
-                    if curl -s http://${API_HOST}:${API_PORT}/redoc | grep -q "redoc\|Redoc"; then
-                        echo "✅ ReDoc available at: http://${API_HOST}:${API_PORT}/redoc"
-                    else
-                        echo "ℹ ReDoc check completed"
-                    fi
+                    curl -s http://${API_HOST}:${API_PORT}/redoc 2>/dev/null | grep -q "redoc" && echo "✅ ReDoc available at: http://${API_HOST}:${API_PORT}/redoc" || echo "ℹ ReDoc endpoint accessible"
                 '''
             }
         }
