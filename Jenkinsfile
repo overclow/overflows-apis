@@ -347,86 +347,45 @@ EOF
     post {
         always {
             script {
-                echo "Collecting artifacts and cleaning up..."
+                echo "🚀 Ensuring API is deployed..."
             }
             sh '''
+                API_URL="http://${API_HOST}:${API_PORT}"
+                
+                if lsof -ti:${API_PORT} > /dev/null 2>&1; then
+                    echo "✅ API already running on port ${API_PORT}"
+                else
+                    echo "Starting API..."
+                    cd "${WORKSPACE}/workflow-api"
+                    nohup "${PYTHON_PATH}" -m uvicorn workflow_api:app --host ${API_HOST} --port ${API_PORT} --workers 2 --log-level info > "${API_LOG_FILE}" 2>&1 &
+                    disown
+                    sleep 3
+                    echo "✅ API deployment initiated"
+                fi
+                
                 echo "Pipeline completed at $(date)"
                 
-                # Archive logs
                 if [ -f "${API_LOG_FILE}" ]; then
-                    echo "Archiving deployment log..."
                     cp "${API_LOG_FILE}" "${WORKSPACE}/api_deployment_${BUILD_ID}.log"
                 fi
             '''
         }
-
-        success {
-            script {
-                echo "✅ Pipeline succeeded!"
-            }
-        }
-
-        always {
-            script {
-                echo "🚀 Ensuring API is deployed..."
-            }
-            sh '''
-                # Always try to deploy/restart the API at the end
-                API_URL="http://${API_HOST}:${API_PORT}"
-                
-                # Check if API is already running
-                if lsof -ti:${API_PORT} > /dev/null 2>&1; then
-                    echo "✅ API is already running on port ${API_PORT}"
-                    curl -s "${API_URL}/" | head -c 100
-                    echo ""
-                else
-                    echo "⚠️ API not running, starting it now..."
-                    
-                    # Start the API
-                    cd "${WORKSPACE}/workflow-api"
-                    
-                    nohup "${PYTHON_PATH}" -m uvicorn workflow_api:app \
-                        --host ${API_HOST} \
-                        --port ${API_PORT} \
-                        --workers 2 \
-                        --log-level info \
-                        > "${API_LOG_FILE}" 2>&1 &
-                    
-                    API_PID=$!
-                    disown
-                    
-                    echo "Started API (PID: ${API_PID})"
-                    sleep 3
-                    
-                    # Verify it started
-                    if curl -s -f "${API_URL}/" > /dev/null 2>&1; then
-                        echo "✅ API is now running!"
-                    else
-                        echo "⚠️ API may not be responding yet"
-                    fi
-                fi
-            '''
-        }
-
-        failure {
-            script {
-                echo "❌ Pipeline encountered issues"
-            }
-            sh '''
-                echo "Debugging info:"
-                echo ""
-                echo "📋 Last 30 lines of deployment log:"
-                tail -30 "${API_LOG_FILE}" 2>/dev/null || echo "No log file"
-                echo ""
-                echo "🔍 Process status on port ${API_PORT}:"
-                lsof -i :${API_PORT} 2>/dev/null || echo "No process found"
-            '''
-        }
-
+        
         success {
             script {
                 echo "✅ Pipeline completed successfully!"
             }
+        }
+        
+        failure {
+            script {
+                echo "⚠️ Pipeline encountered issues (API deployment was still attempted)"
+            }
+            sh '''
+                echo ""
+                echo "Last 20 lines of deployment log:"
+                tail -20 "${API_LOG_FILE}" 2>/dev/null || echo "No log file"
+            '''
         }
     }
 }
