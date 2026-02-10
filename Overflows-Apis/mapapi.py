@@ -8,9 +8,16 @@ from typing import Dict, Optional, Tuple
 import requests
 import base64
 from dotenv import load_dotenv
-import google.generativeai as genai
-# Configure your API key
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+
+# Gracefully handle missing google.generativeai
+try:
+    import google.generativeai as genai
+    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+    GEMINI_AVAILABLE = True
+except ImportError:
+    print("⚠️ Warning: google.generativeai not installed. Gemini features will not work.")
+    genai = None
+    GEMINI_AVAILABLE = False
 
 # Configure the client with your API key
 # client = genai.Client()
@@ -314,6 +321,9 @@ def generate_image_with_gemini(objects_description: str,
         return None, None
 
     try:
+        if not GEMINI_AVAILABLE or not genai:
+            raise RuntimeError("Gemini API not available. Install google-generativeai package.")
+        
         model_name = "gemini-2.5-flash-image-preview"
         image_model = genai.GenerativeModel(model_name)
 
