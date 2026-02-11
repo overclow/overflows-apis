@@ -510,6 +510,9 @@ class WorkflowEngine:
             elif node.type == "generate_3d":
                 result.output = await self.execute_generate_3d(node, inputs)
                 
+            elif node.type == "generate_playing_card":
+                result.output = await self.execute_generate_playing_card(node, inputs)
+                
             elif node.type == "animate_luma":
                 result.output = await self.execute_animate_luma(node, inputs)
                 
@@ -2398,6 +2401,55 @@ Reference-based generation for: {prompt}
                 print(f"⏳ [WORKFLOW] Job {job_id} progress: {progress}% - {message}")
         
         raise Exception("3D generation timed out after 20 minutes")
+    
+    async def execute_generate_playing_card(self, node: WorkflowNode, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute generate_playing_card node - generates random playing cards with custom backgrounds"""
+        
+        # Get configuration
+        background = node.config.get("background", "classic_wood")
+        suit = node.config.get("suit", "random")
+        card_style = node.config.get("card_style", "realistic")
+        
+        print(f"\n🎴 [WORKFLOW] Generating playing card...")
+        print(f"  Background: {background}")
+        print(f"  Suit: {suit}")
+        print(f"  Style: {card_style}")
+        
+        try:
+            # Call the playing card generation endpoint
+            url = f"{self.base_url}/gen/playing-card"
+            payload = {
+                "background": background,
+                "suit": suit,
+                "card_style": card_style
+            }
+            
+            response = requests.post(url, data=payload, timeout=120)
+            response.raise_for_status()
+            
+            result = response.json()
+            
+            if result.get("status") == "completed":
+                print(f"✅ Card generated: {result['card_value']}♦ of {result['suit']}")
+                
+                return {
+                    "status": "completed",
+                    "card_value": result.get("card_value"),
+                    "suit": result.get("suit"),
+                    "suit_symbol": result.get("suit_symbol"),
+                    "card_image_url": result.get("card_image_url"),
+                    "card_image_s3_url": result.get("s3_url"),
+                    "background": background,
+                    "style": card_style,
+                    "job_id": result.get("job_id")
+                }
+            else:
+                raise Exception(f"Card generation failed: {result.get('error', 'Unknown error')}")
+                
+        except requests.exceptions.RequestException as e:
+            error_msg = f"Failed to call playing card endpoint: {str(e)}"
+            print(f"❌ {error_msg}")
+            raise Exception(error_msg)
     
     async def execute_animate_luma(self, node: WorkflowNode, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """Execute animate_luma node - animates with Luma Ray 2"""

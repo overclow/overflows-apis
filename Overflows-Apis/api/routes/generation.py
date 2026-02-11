@@ -1080,3 +1080,257 @@ Maintain the same viewpoint and framing while transforming all elements to be hi
         )
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@router.post("/gen/playing-card")
+async def generate_playing_card(
+    background: str = Form("classic_wood", description="Card background: classic_wood, modern_gradient, gold_luxury, dark_elegant, marble, felt"),
+    suit: str = Form("random", description="Card suit: hearts, diamonds, clubs, spades, random"),
+    card_style: str = Form("realistic", description="Card style: realistic, fantasy, minimalist, neon, vintage"),
+    job_id: str = Form(None),
+):
+    """
+    🎴 Generate Playing Cards - Create randomized playing cards with custom backgrounds
+    
+    Parameters:
+    - background: Card background style (classic_wood, modern_gradient, gold_luxury, dark_elegant, marble, felt)
+    - suit: Card suit (hearts ♥, diamonds ♦, clubs ♣, spades ♠, or random)
+    - card_style: Art style (realistic, fantasy, minimalist, neon, vintage)
+    - job_id: Optional job ID for tracking
+    
+    Returns:
+    - Generated playing card image (standard deck format)
+    - Random face value (A, 2-10, J, Q, K)
+    - S3 URL for card image
+    
+    Example:
+    ```
+    curl -X POST http://localhost:8000/gen/playing-card \\
+        -F "background=gold_luxury" \\
+        -F "suit=hearts" \\
+        -F "card_style=realistic"
+    ```
+    """
+    
+    import random
+    
+    if not USE_GEMINI or not GEMINI_API_KEY:
+        raise HTTPException(400, "Gemini API not configured. Set USE_GEMINI=1 and GEMINI_API_KEY in .env")
+    
+    if not mapapi:
+        raise HTTPException(500, "mapapi not available for card generation")
+    
+    # Generate job ID if not provided
+    if not job_id:
+        job_id = str(uuid.uuid4())
+    
+    print(f"\n{'='*80}")
+    print(f"🎴 PLAYING CARD GENERATION - Job ID: {job_id}")
+    print(f"{'='*80}")
+    print(f"Background: {background}")
+    print(f"Suit: {suit}")
+    print(f"Style: {card_style}")
+    
+    try:
+        # Random card generation
+        suits = ["hearts", "diamonds", "clubs", "spades"]
+        face_values = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
+        
+        selected_suit = random.choice(suits) if suit == "random" else suit
+        selected_value = random.choice(face_values)
+        
+        # Suit symbols
+        suit_symbols = {
+            "hearts": "♥",
+            "diamonds": "♦",
+            "clubs": "♣",
+            "spades": "♠"
+        }
+        suit_symbol = suit_symbols.get(selected_suit, "♠")
+        suit_colors = {
+            "hearts": "red",
+            "diamonds": "red",
+            "clubs": "black",
+            "spades": "black"
+        }
+        suit_color = suit_colors.get(selected_suit, "black")
+        
+        # Background descriptions
+        background_descriptions = {
+            "classic_wood": "classic wooden texture with subtle grain, warm brown tones, professional playing card background",
+            "modern_gradient": "sleek modern gradient from deep blue to purple, contemporary gaming style",
+            "gold_luxury": "luxurious gold filigree patterns on rich burgundy, premium casino style",
+            "dark_elegant": "sophisticated dark charcoal with silver accents, elegant and minimalist",
+            "marble": "white and gray marble texture, luxury and timeless design",
+            "felt": "soft green felt texture like a poker table, authentic casino feel"
+        }
+        
+        background_desc = background_descriptions.get(background, background_descriptions["classic_wood"])
+        
+        # Build comprehensive card generation prompt
+        card_prompt = f"""Generate a professional playing card with the following specifications:
+
+CARD DETAILS:
+- Face Value: {selected_value}
+- Suit: {selected_suit} ({suit_symbol})
+- Suit Color: {suit_color}
+
+DESIGN SPECIFICATIONS:
+- Background: {background_desc}
+- Art Style: {card_style}
+- Format: Standard playing card dimensions (poker size: 3.5" × 2.5" aspect ratio)
+- Quality: High resolution, casino-quality print ready
+
+CARD LAYOUT:
+1. Top-left corner: Large "{selected_value}{suit_symbol}" with suit color
+2. Center: Ornate design featuring suit symbol, balanced and symmetrical
+3. Bottom-right corner: "{selected_value}{suit_symbol}" upside down
+4. Border: Professional framing with subtle shadows
+5. Texture: Anti-glare finish, suitable for actual card stock
+
+ARTISTIC REQUIREMENTS:
+- Professional casino card aesthetic
+- {suit_color} text and symbols
+- {background_desc}
+- {card_style} interpretation of the suit symbol
+- Perfect symmetry for actual playing card production
+- No text except card value and suit symbol
+- High contrast for readability
+
+TECHNICAL REQUIREMENTS:
+- Resolution: 2400x1600 pixels (300 DPI equivalent)
+- Color space: CMYK-ready
+- Edge quality: Clean, professional borders
+- Surface: Matte finish appearance
+
+Generate this playing card with absolute precision. This is for actual card production quality."""
+
+        print(f"\n🎨 Generated: {selected_value} of {selected_suit} {suit_symbol}")
+        print(f"📝 Generating card with {card_style} style...")
+        
+        # Update job status
+        update_job_status(
+            job_id=job_id,
+            status="processing",
+            progress=30,
+            message=f"Generating {selected_value}♦ of {selected_suit} with {background} background...",
+            result={
+                "job_type": "playing_card",
+                "suit": selected_suit,
+                "value": selected_value,
+                "background": background,
+                "style": card_style
+            }
+        )
+        
+        # Generate card using Gemini
+        import google.generativeai as genai
+        genai.configure(api_key=GEMINI_API_KEY)
+        
+        GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-image")
+        model = genai.GenerativeModel(GEMINI_MODEL)
+        
+        print(f"🤖 Calling Gemini ({GEMINI_MODEL})...")
+        response = model.generate_content(card_prompt)
+        
+        # Extract image from response
+        image_bytes = None
+        if hasattr(response, 'candidates') and response.candidates:
+            for part in response.candidates[0].content.parts:
+                if hasattr(part, 'inline_data') and part.inline_data:
+                    image_bytes = part.inline_data.data
+                    break
+        
+        if not image_bytes:
+            raise HTTPException(500, "Gemini did not return a card image")
+        
+        # Save card image
+        out_dir = "generated"
+        os.makedirs(out_dir, exist_ok=True)
+        timestamp = int(time.time())
+        out_filename = f"card_{selected_value}_{selected_suit}_{job_id}_{timestamp}.png"
+        out_path = os.path.join(out_dir, out_filename)
+        
+        with open(out_path, "wb") as f:
+            f.write(image_bytes)
+        
+        print(f"✅ Card image saved: {out_path}")
+        
+        # Upload to S3
+        s3_url = None
+        try:
+            print("☁️ Uploading card to S3...")
+            s3_url = upload_asset_to_s3(
+                file_path=out_path,
+                asset_type="playing_cards",
+                job_id=job_id,
+                asset_name=out_filename
+            )
+            print(f"✅ Uploaded to S3: {s3_url}")
+        except Exception as s3_error:
+            print(f"⚠️ S3 upload failed: {s3_error}")
+        
+        # Determine primary URL
+        primary_card_url = s3_url if s3_url else f"/{out_path}"
+        
+        # Final result
+        result_data = {
+            "job_id": job_id,
+            "job_type": "playing_card",
+            "status": "completed",
+            "card_value": selected_value,
+            "suit": selected_suit,
+            "suit_symbol": suit_symbol,
+            "suit_color": suit_color,
+            "background": background,
+            "style": card_style,
+            "card_image_path": out_path,
+            "card_image_s3_url": s3_url,
+            "card_url": primary_card_url,
+            "timestamp": timestamp
+        }
+        
+        update_job_status(
+            job_id=job_id,
+            status="completed",
+            progress=100,
+            message=f"Playing card generated: {selected_value} of {selected_suit}",
+            result=result_data
+        )
+        
+        print(f"\n{'='*80}")
+        print(f"✅ CARD GENERATED - Job ID: {job_id}")
+        print(f"{'='*80}")
+        print(f"Card: {selected_value}{suit_symbol} ({selected_suit})")
+        print(f"Style: {card_style} on {background}")
+        print(f"S3 URL: {s3_url}")
+        
+        return {
+            "job_id": job_id,
+            "status": "completed",
+            "card_value": selected_value,
+            "suit": selected_suit,
+            "suit_symbol": suit_symbol,
+            "card_image_url": primary_card_url,
+            "s3_url": s3_url,
+            "local_path": out_path,
+            "background": background,
+            "style": card_style,
+            "message": f"Playing card generated: {selected_value}♦ of {selected_suit}"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Card generation error: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        update_job_status(
+            job_id=job_id,
+            status="failed",
+            progress=0,
+            message=f"Card generation failed: {str(e)}",
+            result={"job_type": "playing_card", "error": str(e)}
+        )
+        raise HTTPException(500, f"Card generation failed: {str(e)}")
+

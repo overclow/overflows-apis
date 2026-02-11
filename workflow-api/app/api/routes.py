@@ -313,6 +313,7 @@ async def root():
             "generate_ideogram_turbo": "Generate image with Ideogram V3 Turbo (text-on-image)",
             "optimize_3d": "Optimize image for 3D model generation",
             "generate_3d": "Generate 3D model from image",
+            "generate_playing_card": "Generate random playing cards with custom backgrounds",
             "animate_luma": "Animate with Luma Ray 2",
             "animate_easy": "Animate with Segmind Easy Animate",
             "animate_wan": "Animate with WAN 2.2",
