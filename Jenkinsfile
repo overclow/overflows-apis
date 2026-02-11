@@ -208,7 +208,7 @@ echo "  Log: ${API_LOG_FILE}"
 echo "  Timestamp: $(date)"
 
 # Start API with nohup and disown for persistence
-nohup "${PYTHON_PATH}" -m uvicorn workflow_api:app \
+nohup "${PYTHON_PATH}" -m uvicorn app.core.workflow_engine_full:app \
     --host ${API_HOST} \
     --port ${API_PORT} \
     --workers 2 \
@@ -374,7 +374,7 @@ EOF
     <array>
         <string>/bin/bash</string>
         <string>-c</string>
-        <string>cd /Users/overclaw/projects/overflows-apis/workflow-api && /usr/bin/python3 -m uvicorn workflow_api:app --host 127.0.0.1 --port 8001 --workers 3</string>
+        <string>cd /Users/overclaw/projects/overflows-apis/workflow-api && /usr/bin/python3 -m uvicorn app.core.workflow_engine_full:app --host 127.0.0.1 --port 8001 --workers 3</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
